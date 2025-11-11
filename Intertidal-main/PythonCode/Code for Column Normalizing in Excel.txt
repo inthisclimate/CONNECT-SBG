@@ -1,0 +1,23 @@
+Code for Column Normalizing 
+Windows --> Alt + F11 --> Module --> Paste Code --> Run with Alt + F8
+Mac --> Option + fn + F11 --> Module --> Paste Code --> Run with Option + fn + F8
+
+Sub DivideByColumnG()
+    Dim ws As Worksheet
+    Set ws = ActiveSheet
+    
+    Dim lastRow As Long, lastCol As Long
+    Dim r As Long, c As Long
+    
+    lastRow = ws.Cells(ws.Rows.Count, "G").End(xlUp).Row
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+
+    For c = 9 To lastCol ' Start at column I (9th column)
+        For r = 1 To lastRow
+            If ws.Cells(r, "G").Value <> 0 And IsNumeric(ws.Cells(r, c).Value) Then
+                ws.Cells(r, c).Value = ws.Cells(r, c).Value / ws.Cells(r, "G").Value
+            End If
+        Next r
+    Next c
+End Sub
+
