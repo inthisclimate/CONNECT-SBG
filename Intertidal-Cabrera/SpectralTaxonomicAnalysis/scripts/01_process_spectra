@@ -1,3 +1,22 @@
+"""
+01_process_spectra.py
+
+Purpose:
+Process Spectral Evolution .sed files collected for the
+intertidal spectral-taxonomic diversity project.
+
+Workflow adapted from Cabrera's original SED.py and Normalize.py:
+1. Read target radiance from .sed files.
+2. Restrict spectra to 400-900 nm.
+3. Average five Spectralon white-reference measurements.
+4. Convert target radiance to relative reflectance.
+5. Preserve individual target measurements for subsequent
+   quadrat assignment and spectral-diversity analysis.
+
+IMPORTANT:
+Do not average the three within-quadrat spectral replicates here.
+"""
+
 import os
 import pandas as pd
 import numpy as np
