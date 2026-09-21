@@ -19,10 +19,8 @@ Do not average the three within-quadrat spectral replicates here.
 
 import os
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 
+""" FUNCTIONS """
 def read_sed_file(filepath, use_column=2):
     metadata = {}
     wavelengths = []
@@ -60,7 +58,11 @@ def read_sed_file(filepath, use_column=2):
     return metadata, wavelengths, radiances
 
 def process_sed_directory(directory, output_dir=None, use_column=2):
-    sed_files = [f for f in os.listdir(directory) if f.lower().endswith('.sed')]
+    sed_files = sorted(
+        [f for f in os.listdir(directory)
+         if f.lower().endswith('.sed')]
+    )
+
     if not sed_files:
         raise ValueError(f"No .sed files found in {directory}.")
 
@@ -98,64 +100,28 @@ def process_sed_directory(directory, output_dir=None, use_column=2):
 
     return df, meta_df
 
-def extract_features(spectra_df):
-    features = []
-    for col in spectra_df.columns:
-        spectrum = spectra_df[col]
-        features.append([
-            np.mean(spectrum),
-            np.max(spectrum),
-            spectrum.idxmax(),
-            spectrum.iloc[-1] / spectrum.iloc[0] if spectrum.iloc[0] != 0 else 0,
-            np.std(spectrum) / np.mean(spectrum) if np.mean(spectrum) != 0 else 0
-        ])
-    feature_names = ['mean', 'max', 'peak_wavelength', 'slope', 'flatness']
-    return pd.DataFrame(features, index=spectra_df.columns, columns=feature_names)
 
-def cluster_spectra(features_df, n_clusters=3):
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto')
-    labels = kmeans.fit_predict(features_df)
-    features_df['cluster'] = labels
-    return features_df
+""" Normalize Spectra """
 
-def plot_clusters(spectra_df, cluster_labels, output_dir=None):
-    unique_clusters = np.unique(cluster_labels)
-    colors = plt.cm.get_cmap('tab10', len(unique_clusters))
-    fig, ax = plt.subplots(figsize=(12, 6))
+def calculate_relative_reflectance(spectra_df):
 
-    for idx, col in enumerate(spectra_df.columns):
-        cluster_id = cluster_labels[idx]
-        ax.plot(spectra_df.index, spectra_df[col], color=colors(cluster_id), alpha=0.5)
+    # Restrict spectra to 400-900 nm
+    spectra_filtered = spectra_df.loc[400:900]
 
-    ax.set_xlabel('Wavelength (nm)')
-    ax.set_ylabel('Radiance (W/m²/sr/nm)')
-    ax.set_title('Spectra colored by cluster')
-    plt.grid(True)
-    if output_dir:
-        plt.savefig(os.path.join(output_dir, 'clustered_spectra.png'), dpi=300)
-    plt.close()
+    # First five measurements are Spectralon white references
+    white_spectra = spectra_filtered.iloc[:, 0:5]
 
-def plot_cluster_means(spectra_df, cluster_labels, output_dir=None):
-    unique_clusters = np.unique(cluster_labels)
-    colors = plt.cm.get_cmap('tab10', len(unique_clusters))
-    fig, ax = plt.subplots(figsize=(12, 6))
+    # Average the five Spectralon measurements at each wavelength
+    white_reference = white_spectra.mean(axis=1)
 
-    for cluster_id in unique_clusters:
-        spectra_in_cluster = spectra_df.iloc[:, np.where(cluster_labels == cluster_id)[0]]
-        mean_spectrum = spectra_in_cluster.mean(axis=1)
-        ax.plot(spectra_df.index, mean_spectrum, label=f'Cluster {cluster_id}', color=colors(cluster_id))
+    # All remaining measurements are field targets
+    target_spectra = spectra_filtered.iloc[:, 5:]
 
-    ax.set_xlabel('Wavelength (nm)')
-    ax.set_ylabel('Mean Radiance (W/m²/sr/nm)')
-    ax.set_title('Cluster Mean Spectra')
-    ax.legend()
-    plt.grid(True)
-    if output_dir:
-        plt.savefig(os.path.join(output_dir, 'cluster_means.png'), dpi=300)
-    plt.close()
+    # Convert target radiance to relative reflectance
+    relative_reflectance = target_spectra.div(
+        white_reference,
+        axis=0
+    )
 
-############################################
-# Process Sed:
-directory = "/Users/kylamonique/Desktop/JPLFiles/SpectralEvolution/SEDextracts/sedDataSD" #change to your directory
-output_dir = '/Users/kylamonique/Desktop/JPLFiles/SpectralEvolution/SEDextracts/SDoutputs'
-spectra_df, metadata_df = process_sed_directory(directory, output_dir=output_dir)
+    return relative_reflectance, white_reference
+
