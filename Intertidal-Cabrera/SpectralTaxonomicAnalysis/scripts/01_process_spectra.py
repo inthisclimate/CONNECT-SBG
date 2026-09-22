@@ -95,29 +95,26 @@ def process_sed_directory(directory, output_dir=None, use_column=2):
 
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-        df.to_csv(os.path.join(output_dir, 'spectra_data.csv'))
-        meta_df.to_csv(os.path.join(output_dir, 'spectra_metadata.csv'), index=False)
+        df.to_csv(os.path.join(output_dir, 'LCDM_050225_radiance.csv'))
+        meta_df.to_csv(os.path.join(output_dir, 'LCDM_050225_radiance_metadata.csv'), index=False)
 
     return df, meta_df
 
 
 """ Normalize Spectra """
 
-def calculate_relative_reflectance(spectra_df):
+def calculate_relative_reflectance(spectra_df, reference_df):
 
-    # Restrict spectra to 400-900 nm
-    spectra_filtered = spectra_df.loc[400:900]
+    # Restrict sample spectra to 400-900 nm
+    target_spectra = spectra_df.loc[400:900]
 
-    # First five measurements are Spectralon white references
-    white_spectra = spectra_filtered.iloc[:, 0:5]
+    # Restrict Spectralon reference spectra to 400-900 nm
+    reference_spectra = reference_df.loc[400:900]
 
     # Average the five Spectralon measurements at each wavelength
-    white_reference = white_spectra.mean(axis=1)
+    white_reference = reference_spectra.mean(axis=1)
 
-    # All remaining measurements are field targets
-    target_spectra = spectra_filtered.iloc[:, 5:]
-
-    # Convert target radiance to relative reflectance
+    # Divide each sample spectrum by the mean Spectralon spectrum
     relative_reflectance = target_spectra.div(
         white_reference,
         axis=0
@@ -125,3 +122,69 @@ def calculate_relative_reflectance(spectra_df):
 
     return relative_reflectance, white_reference
 
+""" RUN PROCESSING """
+
+# Folder containing sample .sed files
+directory = r"C:\Users\Gabriela Shirkey\OneDrive - Chapman University\CONNECT_SBG\Coastal-Tanner\SpectralEvolution\LCDM_2005_3A02\LCDM 05_02"
+
+# Folder containing the five Spectralon .sed files
+reference_dir = r"C:\Users\Gabriela Shirkey\OneDrive - Chapman University\CONNECT_SBG\Coastal-Tanner\SpectralEvolution\LCDM_2005_3A02\LCDM 05_02\Reference"
+
+# Folder for processed outputs
+output_dir = r"C:\Users\Gabriela Shirkey\OneDrive - Chapman University\CONNECT_SBG\Coastal-Tanner\SpectralEvolution\LCDM_2005_3A02\LCDM_2005_3A02_processed"
+
+
+# Read sample .sed files
+spectra_df, metadata_df = process_sed_directory(
+    directory,
+    output_dir
+)
+
+
+# Read the five Spectralon reference .sed files
+reference_df, reference_metadata_df = process_sed_directory(
+    reference_dir
+)
+
+# Confirm that exactly five Spectralon measurements were read
+if reference_df.shape[1] != 5:
+    raise ValueError(
+        f"Expected 5 Spectralon reference spectra, "
+        f"but found {reference_df.shape[1]}."
+    )
+
+# Calculate relative reflectance
+relative_reflectance, white_reference = calculate_relative_reflectance(
+    spectra_df,
+    reference_df
+)
+
+# Save relative reflectance
+relative_reflectance.to_csv(
+    os.path.join(
+        output_dir,
+        "LCDM_050225_relative_reflectance.csv"
+    )
+)
+
+# Save the mean Spectralon white reference
+white_reference.to_csv(
+    os.path.join(
+        output_dir,
+        "LCDM_050225_white_reference.csv"
+    ),
+    header=["mean_spectralon"]
+)
+
+## sample plots after quadrat identities have been assigned
+close_quadrats = quadrat_table[quadrat_table["distance_m"] <= 10].sample(5)
+mid_quadrats = quadrat_table[
+    quadrat_table["distance_m"].between(20, 30)
+].sample(5)
+far_quadrats = quadrat_table[quadrat_table["distance_m"] >= 40].sample(5)
+
+qc_quadrats = pd.concat([
+    close_quadrats,
+    mid_quadrats,
+    far_quadrats
+])
